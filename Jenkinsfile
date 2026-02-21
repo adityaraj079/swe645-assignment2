@@ -48,13 +48,9 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    $DOCKER_BIN buildx create --use || true
-                    $DOCKER_BIN buildx inspect --bootstrap
-
-                    $DOCKER_BIN buildx build \
-                    --platform linux/amd64 \
-                    -t $FULL_IMAGE \
-                    --push .
+                    $DOCKER_BIN build \
+                    --platform=linux/amd64 \
+                    -t $FULL_IMAGE .
                 '''
             }
         }
