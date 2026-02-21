@@ -7,7 +7,7 @@ pipeline {
         KUBECTL_BIN = "${DOCKER_HOME}/kubectl"
 
         DOCKER_REPO = "rajaditya079/swe645-webapp"
-        IMAGE_TAG   = "v${BUILD_NUMBER}"           // keep versioning
+        IMAGE_TAG   = "latest"                     // always latest
         FULL_IMAGE  = "${DOCKER_REPO}:${IMAGE_TAG}"
 
         DOCKER_CONFIG = "${WORKSPACE}/.docker"
@@ -48,7 +48,6 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    # Standard build (no buildx / platform flag)
                     $DOCKER_BIN build -t $FULL_IMAGE .
                 '''
             }
@@ -69,20 +68,39 @@ pipeline {
                     variable: 'KUBECONFIG'
                 )]) {
                     sh '''
-                        # Apply deployment from repo
+                        # Apply deployment (creates if missing)
                         $KUBECTL_BIN apply -f deployment.yaml
 
-                        # Update deployment to use the new image
+                        # Update deployment with latest image
                         $KUBECTL_BIN set image deployment/swe645-deployment \
-                        swe645-container=$FULL_IMAGE
+                        swe645-container=$FULL_IMAGE --record
 
                         # Wait for rollout to complete
                         $KUBECTL_BIN rollout status deployment/swe645-deployment
 
-                        # Delete old ReplicaSets with 0 ready pods
-                        for rs in $($KUBECTL_BIN get rs -o jsonpath='{.items[?(@.status.readyReplicas==0)].metadata.name}'); do
-                            $KUBECTL_BIN delete rs $rs
+                        echo "Deleting old pods one by one while new pods are running..."
+                        TIMEOUT=120
+                        ELAPSED=0
+
+                        while true; do
+                            OLD_PODS=$($KUBECTL_BIN get pods -l app=swe645-app -o jsonpath='{.items[?(@.spec.containers[0].image!="'$FULL_IMAGE'")].metadata.name}')
+                            if [ -z "$OLD_PODS" ]; then
+                                echo "No old pods remaining."
+                                break
+                            fi
+                            for pod in $OLD_PODS; do
+                                echo "Deleting old pod: $pod"
+                                $KUBECTL_BIN delete pod $pod --grace-period=5
+                            done
+                            sleep 5
+                            ELAPSED=$((ELAPSED+5))
+                            if [ $ELAPSED -ge $TIMEOUT ]; then
+                                echo "Timeout reached: some old pods did not terminate within $TIMEOUT seconds."
+                                exit 1
+                            fi
                         done
+
+                        echo "All old pods removed. Deployment fully clean."
                     '''
                 }
             }
