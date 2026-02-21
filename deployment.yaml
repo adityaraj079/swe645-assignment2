@@ -17,7 +17,7 @@ spec:
           image: rajaditya079/swe645-assignment2-amd64:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 80
       # Ensure old pods are deleted if deployment is updated
       restartPolicy: Always
 ---
