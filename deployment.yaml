@@ -14,10 +14,10 @@ spec:
     spec:
       containers:
         - name: swe645-container
-          image: rajaditya079/swe645-webapp:latest
+          image: rajaditya079/swe645-assignment2-amd64:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 80
+            - containerPort: 8080
       # Ensure old pods are deleted if deployment is updated
       restartPolicy: Always
 ---
