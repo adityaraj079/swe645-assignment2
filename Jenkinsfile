@@ -44,14 +44,29 @@ pipeline {
                 }
             }
         }
+        stage('Debug Docker') {
+            steps {
+                sh '''
+                    /Applications/Docker.app/Contents/Resources/bin/docker version
+                    /Applications/Docker.app/Contents/Resources/bin/docker buildx version
+                    /Applications/Docker.app/Contents/Resources/bin/docker buildx ls
+                '''
+            }
+        }
 
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    $DOCKER_BIN buildx build \
+                    export DOCKER_CLI_EXPERIMENTAL=enabled
+
+                    /Applications/Docker.app/Contents/Resources/bin/docker buildx create --use --name jenkins-builder || true
+
+                    /Applications/Docker.app/Contents/Resources/bin/docker buildx inspect --bootstrap
+
+                    /Applications/Docker.app/Contents/Resources/bin/docker buildx build \
                     --platform linux/amd64 \
                     --push \
-                    -t $FULL_IMAGE .
+                    -t rajaditya079/swe645-webapp:latest .
                 '''
             }
         }
