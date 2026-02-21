@@ -7,7 +7,7 @@ pipeline {
         KUBECTL_BIN = "${DOCKER_HOME}/kubectl"
 
         DOCKER_REPO = "rajaditya079/swe645-webapp"
-        IMAGE_TAG   = "v${BUILD_NUMBER}"            // keep your versioning
+        IMAGE_TAG   = "v${BUILD_NUMBER}"           // keep versioning
         FULL_IMAGE  = "${DOCKER_REPO}:${IMAGE_TAG}"
 
         DOCKER_CONFIG = "${WORKSPACE}/.docker"
@@ -48,11 +48,16 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    # Multi-arch build: amd64 + arm64
-                    $DOCKER_BIN buildx build \
-                        --platform linux/amd64,linux/arm64 \
-                        -t $FULL_IMAGE \
-                        --push .
+                    # Standard build (no buildx / platform flag)
+                    $DOCKER_BIN build -t $FULL_IMAGE .
+                '''
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                sh '''
+                    $DOCKER_BIN push $FULL_IMAGE
                 '''
             }
         }
@@ -67,14 +72,14 @@ pipeline {
                         # Apply deployment from repo
                         $KUBECTL_BIN apply -f deployment.yaml
 
-                        # Update deployment with new image
+                        # Update deployment to use the new image
                         $KUBECTL_BIN set image deployment/swe645-deployment \
                         swe645-container=$FULL_IMAGE
 
                         # Wait for rollout to complete
                         $KUBECTL_BIN rollout status deployment/swe645-deployment
 
-                        # Delete old ReplicaSets with 0 ready pods to avoid CrashLoopBackOff
+                        # Delete old ReplicaSets with 0 ready pods
                         for rs in $($KUBECTL_BIN get rs -o jsonpath='{.items[?(@.status.readyReplicas==0)].metadata.name}'); do
                             $KUBECTL_BIN delete rs $rs
                         done
