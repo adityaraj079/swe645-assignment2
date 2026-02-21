@@ -48,10 +48,9 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    export DOCKER_BUILDKIT=1
-                    $DOCKER_BIN build \
-                    --platform=linux/amd64 \
-                    --no-cache \
+                    docker buildx build \
+                    --platform linux/amd64 \
+                    --push \
                     -t $FULL_IMAGE .
                 '''
             }
