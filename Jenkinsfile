@@ -6,9 +6,34 @@ pipeline {
         DOCKER_REPO = "rajaditya079/swe645-webapp"
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE = "${DOCKER_REPO}:${IMAGE_TAG}"
+        DOCKER_CONFIG = "${WORKSPACE}/.docker"   // override docker config
     }
 
     stages {
+
+        stage('Prepare Docker Config') {
+            steps {
+                sh """
+                    mkdir -p ${DOCKER_CONFIG}
+                    echo '{}' > ${DOCKER_CONFIG}/config.json
+                """
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo ${DOCKER_PASS} | ${DOCKER_BIN} login \
+                        -u ${DOCKER_USER} --password-stdin
+                    """
+                }
+            }
+        }
 
         stage('Build Docker Image') {
             steps {
@@ -20,16 +45,9 @@ pipeline {
 
         stage('Push to DockerHub') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        echo ${DOCKER_PASS} | ${DOCKER_BIN} login -u ${DOCKER_USER} --password-stdin
-                        ${DOCKER_BIN} push ${FULL_IMAGE}
-                    """
-                }
+                sh """
+                    ${DOCKER_BIN} push ${FULL_IMAGE}
+                """
             }
         }
 
@@ -41,7 +59,7 @@ pipeline {
                 )]) {
                     sh """
                         kubectl set image deployment/swe645-deployment \
-                        swe645-container=${FULL_IMAGE} --record
+                        swe645-container=${FULL_IMAGE}
 
                         kubectl rollout status deployment/swe645-deployment
                     """
