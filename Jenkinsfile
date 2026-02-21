@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        DOCKER_BIN = "/Applications/Docker.app/Contents/Resources/bin/docker"
         DOCKER_REPO = "rajaditya079/swe645-webapp"
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE = "${DOCKER_REPO}:${IMAGE_TAG}"
@@ -12,7 +13,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh """
-                    docker build -t ${FULL_IMAGE} .
+                    ${DOCKER_BIN} build -t ${FULL_IMAGE} .
                 """
             }
         }
@@ -20,13 +21,13 @@ pipeline {
         stage('Push to DockerHub') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'rajaditya079',
+                    credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh """
-                        echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-                        docker push ${FULL_IMAGE}
+                        echo ${DOCKER_PASS} | ${DOCKER_BIN} login -u ${DOCKER_USER} --password-stdin
+                        ${DOCKER_BIN} push ${FULL_IMAGE}
                     """
                 }
             }
