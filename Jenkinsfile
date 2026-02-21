@@ -69,7 +69,7 @@ pipeline {
                 )]) {
                     sh '''
                         # Apply deployment (creates if missing)
-                        $KUBECTL_BIN apply -f k8s/deployment.yaml
+                        $KUBECTL_BIN apply -f deployment.yaml
 
                         # Update image dynamically
                         $KUBECTL_BIN set image deployment/swe645-deployment \
