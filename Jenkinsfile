@@ -68,9 +68,14 @@ pipeline {
                     variable: 'KUBECONFIG'
                 )]) {
                     sh '''
+                        # Apply deployment (creates if missing)
+                        $KUBECTL_BIN apply -f k8s/deployment.yaml
+
+                        # Update image dynamically
                         $KUBECTL_BIN set image deployment/swe645-deployment \
                         swe645-container=$FULL_IMAGE
 
+                        # Wait for rollout
                         $KUBECTL_BIN rollout status deployment/swe645-deployment
                     '''
                 }
