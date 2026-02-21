@@ -18,6 +18,8 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 80
+      # Ensure old pods are deleted if deployment is updated
+      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
