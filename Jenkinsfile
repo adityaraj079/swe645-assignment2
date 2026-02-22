@@ -36,11 +36,19 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        echo "Logging into DockerHub..."
+                        echo "Creating temporary Docker config..."
+
+                        mkdir -p .docker
+                        export DOCKER_CONFIG=$PWD/.docker
+
+                        echo "Logging into DockerHub (without credential helper)..."
                         echo $DOCKER_PASS | $DOCKER_BIN login -u $DOCKER_USER --password-stdin
 
-                        echo "Pushing image to DockerHub..."
+                        echo "Pushing image..."
                         $DOCKER_BIN push $FULL_IMAGE
+
+                        echo "Cleaning up..."
+                        rm -rf .docker
                     '''
                 }
             }
