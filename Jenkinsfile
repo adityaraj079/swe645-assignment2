@@ -7,7 +7,7 @@ pipeline {
         KUBECTL_BIN = "${DOCKER_HOME}/kubectl"
 
         DOCKER_REPO = "rajaditya079/swe645-assignment2-amd64"
-        IMAGE_TAG   = "latest"
+        IMAGE_TAG   = "${BUILD_NUMBER}"
         FULL_IMAGE  = "${DOCKER_REPO}:${IMAGE_TAG}"
     }
 
@@ -19,16 +19,7 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                sh '''
-                    echo "Building Docker image..."
-                    $DOCKER_BIN build -t $FULL_IMAGE .
-                '''
-            }
-        }
-
-        stage('Push to DockerHub') {
+        stage('Build and Push AMD64 Image') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -36,18 +27,24 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        echo "Creating temporary Docker config..."
-
+                        echo "Setting up temporary Docker config..."
                         mkdir -p .docker
                         export DOCKER_CONFIG=$PWD/.docker
 
-                        echo "Logging into DockerHub (without credential helper)..."
+                        echo "Logging into DockerHub..."
                         echo $DOCKER_PASS | $DOCKER_BIN login -u $DOCKER_USER --password-stdin
 
-                        echo "Pushing image..."
-                        $DOCKER_BIN push $FULL_IMAGE
+                        echo "Creating buildx builder (if not exists)..."
+                        $DOCKER_BIN buildx create --use --name amd64-builder || true
 
-                        echo "Cleaning up..."
+                        echo "Building and pushing linux/amd64 image..."
+                        $DOCKER_BIN buildx build \
+                            --platform linux/amd64 \
+                            -t $FULL_IMAGE \
+                            --push \
+                            .
+
+                        echo "Cleaning up Docker config..."
                         rm -rf .docker
                     '''
                 }
@@ -61,20 +58,15 @@ pipeline {
                     variable: 'KUBECONFIG'
                 )]) {
                     sh '''
-                        echo "Applying Kubernetes deployment..."
-                        $KUBECTL_BIN apply -f deployment.yaml
+                        echo "Updating deployment image to $FULL_IMAGE"
 
-                        echo "Updating image to $FULL_IMAGE"
                         $KUBECTL_BIN set image deployment/swe645-deployment \
                         swe645-container=$FULL_IMAGE
-
-                        echo "Forcing rollout restart..."
-                        $KUBECTL_BIN rollout restart deployment/swe645-deployment
 
                         echo "Waiting for rollout..."
                         $KUBECTL_BIN rollout status deployment/swe645-deployment
 
-                        echo "Deployment completed successfully."
+                        echo "Deployment successful."
                     '''
                 }
             }
@@ -83,7 +75,7 @@ pipeline {
 
     post {
         success {
-            echo "Deployment successful: ${FULL_IMAGE}"
+            echo "Build and deployment successful: ${FULL_IMAGE}"
         }
         failure {
             echo "Pipeline failed."
