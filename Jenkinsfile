@@ -9,6 +9,8 @@ pipeline {
         DOCKER_REPO = "rajaditya079/swe645-assignment2-amd64"
         IMAGE_TAG   = "${BUILD_NUMBER}"
         FULL_IMAGE  = "${DOCKER_REPO}:${IMAGE_TAG}"
+
+        DOCKER_DEFAULT_PLATFORM = "linux/amd64"
     }
 
     stages {
@@ -19,7 +21,17 @@ pipeline {
             }
         }
 
-        stage('Build and Push AMD64 Image') {
+        stage('Build Docker Image (AMD64)') {
+            steps {
+                sh '''
+                    echo "Building Docker image for linux/amd64..."
+                    export DOCKER_DEFAULT_PLATFORM=linux/amd64
+                    $DOCKER_BIN build -t $FULL_IMAGE .
+                '''
+            }
+        }
+
+        stage('Push to DockerHub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -32,13 +44,9 @@ pipeline {
 
                         echo $DOCKER_PASS | $DOCKER_BIN login -u $DOCKER_USER --password-stdin
 
-                        $DOCKER_BIN buildx use amd64builder
+                        $DOCKER_BIN push $FULL_IMAGE
 
-                        $DOCKER_BIN buildx build \
-                            --platform linux/amd64 \
-                            -t $FULL_IMAGE \
-                            --push \
-                            .
+                        rm -rf .docker
                     '''
                 }
             }
@@ -58,6 +66,15 @@ pipeline {
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment successful: ${FULL_IMAGE}"
+        }
+        failure {
+            echo "Pipeline failed."
         }
     }
 }
