@@ -27,25 +27,18 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        echo "Setting up temporary Docker config..."
                         mkdir -p .docker
                         export DOCKER_CONFIG=$PWD/.docker
 
-                        echo "Logging into DockerHub..."
                         echo $DOCKER_PASS | $DOCKER_BIN login -u $DOCKER_USER --password-stdin
 
-                        echo "Creating buildx builder (if not exists)..."
-                        $DOCKER_BIN buildx create --use --name amd64-builder || true
+                        $DOCKER_BIN buildx use amd64builder
 
-                        echo "Building and pushing linux/amd64 image..."
                         $DOCKER_BIN buildx build \
                             --platform linux/amd64 \
                             -t $FULL_IMAGE \
                             --push \
                             .
-
-                        echo "Cleaning up Docker config..."
-                        rm -rf .docker
                     '''
                 }
             }
@@ -58,27 +51,13 @@ pipeline {
                     variable: 'KUBECONFIG'
                 )]) {
                     sh '''
-                        echo "Updating deployment image to $FULL_IMAGE"
-
                         $KUBECTL_BIN set image deployment/swe645-deployment \
                         swe645-container=$FULL_IMAGE
 
-                        echo "Waiting for rollout..."
                         $KUBECTL_BIN rollout status deployment/swe645-deployment
-
-                        echo "Deployment successful."
                     '''
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Build and deployment successful: ${FULL_IMAGE}"
-        }
-        failure {
-            echo "Pipeline failed."
         }
     }
 }
